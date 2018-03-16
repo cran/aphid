@@ -4,8 +4,8 @@
 #'
 #' @param x an object of class \code{"dendrogram"}, or a list or matrix of
 #'   sequences (possibly a "DNAbin" or "AAbin" object) from which to derive a
-#'   dendrogram using the \code{\link[phylogram]{topdown}} function in the
-#'   \code{\link[phylogram]{phylogram}} package.
+#'   dendrogram using the \code{\link[kmer]{cluster}} function in the
+#'   \code{\link[kmer]{kmer}} package.
 #' @param method a character string indicating the weighting method to be used.
 #'   Currently only that of Gerstein et al (1994) is supported
 #'   (\code{method = "Gerstein"}).
@@ -48,7 +48,7 @@
 #'   Gerstein M, Sonnhammer ELL, Chothia C (1994) Volume changes in protein evolution.
 #'   \emph{Journal of Molecular Biology}, \strong{236}, 1067-1078.
 #'
-#' @seealso \code{\link[phylogram]{topdown}}
+#' @seealso \code{\link[kmer]{cluster}}
 #' @examples
 #'   ## weight the sequences in the woodmouse dataset from the ape package
 #'   library(ape)
@@ -98,7 +98,7 @@ weight.list <- function(x, method = "Gerstein", k = 5, residues = NULL,
   tmpnames <- names(x)
   names(x) <- paste0("S", 1:nsq)
   if(nsq > 2){
-    guidetree <- phylogram::topdown(x, k = k, residues = residues, gap = gap)
+    guidetree <- kmer::cluster(x, k = k, residues = residues, gap = gap)
     res <- weight.dendrogram(guidetree, method = "Gerstein")[names(x)]
   }else if(nsq == 2){
     res <- c(1, 1)
@@ -115,9 +115,16 @@ weight.list <- function(x, method = "Gerstein", k = 5, residues = NULL,
 ################################################################################
 weight.dendrogram <- function(x, method = "Gerstein", ...){
   if(!identical(method, "Gerstein")) stop("Only Gerstein method supported")
+  if(is.leaf(x)) return(structure(1, names = attr(x, "label")))
   acal <- function(d) !any(sapply(d, is.list)) # all children are leaves?
   md <- function(d) all(sapply(d, acal)) & !acal(d) # mergable dendro?
   ch <- function(d) sapply(d, attr, "height") # child heights
+  if(acal(x)){
+    res <- attr(x, "height") - ch(x) + 0.0000001
+    res <- length(res) * (res/sum(res))
+    names(res) <- sapply(x, attr, "label")
+    return(res)
+  }
   Gerstein <- function(x){ # x is a dendrogram
     ngrandchildren <- sapply(x, length)
     childisdendro <- ngrandchildren > 1
@@ -129,8 +136,7 @@ weight.dendrogram <- function(x, method = "Gerstein", ...){
       #  list same length as childedges
       grandchildedges <- mapply("-", childheights, grandchildheights,
                                 SIMPLIFY = FALSE)
-      grandchildedges <- lapply(grandchildedges, function(e){
-        e + 0.0000001})
+      grandchildedges <- lapply(grandchildedges, function(e) e + 0.0000001)
       # this just safeguards against 0 denominators (but is a bit of a hack)
       ratios <- lapply(grandchildedges, function(v) v/sum(v))
       inheritances <- mapply("*", childedges, ratios, SIMPLIFY = FALSE)

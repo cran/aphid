@@ -11,9 +11,14 @@
 #' @param method a character string specifying the iterative model training
 #'   method to use. Accepted methods are \code{"Viterbi"} (the default)
 #'   and \code{"BaumWelch"}.
-#' @param seqweights either NULL (default; all sequences are given
-#'   weights of 1) or a numeric vector the same length as \code{x}
-#'   representing the sequence weights used to derive the model.
+#' @param seqweights either NULL (all sequences are given weights
+#'   of 1), a numeric vector the same length as \code{y} representing
+#'   the sequence weights used to derive the model, or a character string giving
+#'   the method to derive the weights from the sequences. Currently only the
+#'   \code{"Gerstein"} method is supported (default). For this method, a
+#'   tree is first created by k-mer counting (see \code{\link[kmer]{cluster}}),
+#'   and sequence weights are then derived from the tree using the 'bottom up'
+#'   algorithm of Gerstein et al (1994).
 #' @param wfactor numeric. The factor to multiply the sequence weights by.
 #'   Defaults to 1.
 #' @param k integer representing the k-mer size to be used in tree-based
@@ -267,9 +272,7 @@ train.PHMM <- function(x, y, method = "Viterbi", seqweights = "Gerstein",
       navailcores <- parallel::detectCores()
       if(identical(cores, "autodetect")) cores <- navailcores - 1
       if(cores > 1){
-        if(cores > navailcores){
-          stop("Number of cores is more than the number available")
-        }
+        # if(cores > navailcores) stop("No. cores is more than number available")
         if(!quiet) cat("Multithreading over", cores, "cores\n")
         cores <- parallel::makeCluster(cores)
         para <- TRUE

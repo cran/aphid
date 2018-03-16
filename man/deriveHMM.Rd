@@ -11,9 +11,9 @@ deriveHMM(x, seqweights = NULL, residues = NULL, states = NULL,
 \item{x}{a list of named character vectors representing emissions
 from the model. The 'names' attribute should represent the hidden state
 from which each residue was emitted. "DNAbin" and "AAbin" list
-objects are also supported for moeling DNA or amino acid sequences.}
+objects are also supported for modeling DNA or amino acid sequences.}
 
-\item{seqweights}{either NULL (default; all sequences are given
+\item{seqweights}{either NULL (all sequences are given
 weights of 1) or a numeric vector the same length as \code{x} representing
 the sequence weights used to derive the model.}
 

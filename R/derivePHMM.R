@@ -5,12 +5,12 @@
 #'
 #' @param x a matrix of aligned sequences or a list of unaligned sequences.
 #'   Accepted modes are "character" and "raw" (for "DNAbin" and "AAbin" objects).
-#' @param seqweights either NULL (default; all sequences are given
-#'   weights of 1), a numeric vector the same length as \code{x} representing
+#' @param seqweights either NULL (all sequences are given weights
+#'   of 1), a numeric vector the same length as \code{x} representing
 #'   the sequence weights used to derive the model, or a character string giving
 #'   the method to derive the weights from the sequences. Currently only the
 #'   \code{"Gerstein"} method is supported (default). For this method, a
-#'   tree is first created by k-mer counting (see \code{\link[phylogram]{topdown}}),
+#'   tree is first created by k-mer counting (see \code{\link[kmer]{cluster}}),
 #'   and sequence weights are then derived from the tree using the 'bottom up'
 #'   algorithm of Gerstein et al (1994).
 #' @param wfactor numeric. The factor to multiply the sequence weights by.
@@ -322,9 +322,7 @@ derivePHMM.list <- function(x, progressive = FALSE, seeds = NULL,
     navailcores <- parallel::detectCores()
     if(identical(cores, "autodetect")) cores <- navailcores - 1
     if(cores > 1){
-      if(cores > navailcores){
-        stop("Number of cores is more than the number available")
-      }
+      # if(cores > navailcores) stop("No. cores is more than number available")
       if(!quiet) cat("Multithreading over", cores, "cores\n")
       cores <- parallel::makeCluster(cores)
       para <- TRUE
@@ -358,7 +356,7 @@ derivePHMM.list <- function(x, progressive = FALSE, seeds = NULL,
         stopifnot(mode(seqweights) %in% c("numeric", "integer"),
                   length(seqweights) == nseq)
       }
-      guidetree <- phylogram::topdown(x[seeds], k = k,
+      guidetree <- kmer::cluster(x[seeds], k = k,
                                       residues = residues, gap = gap)
       attachseqs <- function(tree, sequences){
         if(!is.list(tree)){
@@ -404,12 +402,22 @@ derivePHMM.list <- function(x, progressive = FALSE, seeds = NULL,
                   length(seqweights) == nseq)
       }
       xlengths <- sapply(x, length)
-      longl <- xlengths == max(xlengths) #logical
+      ## model length is based on max frequency
+      lm <- as.numeric(names(sort(table(xlengths), decreasing = TRUE)[1]))
+      if(!is.null(maxsize)){
+        xlengths2 <- xlengths[xlengths <= maxsize]
+        if(length(xlengths2) == 0) stop("maxsize parameter is too low")
+        if(lm > maxsize) lm <- max(xlengths2)
+      }
+      longl <- xlengths == lm
+      # longl <- xlengths == max(xlengths) #logical
+      # changed Aug2017 to reflect frequency rather than length
       seeds <- which.min(seqweights[longl]) #index (or indices)
       if(length(seeds) > 1) seeds <- sample(seeds, size = 1) # length 1 index
       seed <- x[longl][[seeds]]
       msa1 <- matrix(seed, nrow = 1)
-      ### in future could offer max freq seq option here
+      colnames(msa1) <- paste(1:ncol(msa1))
+      ## colnames are used when inserts = "inherited"
     }
   }else if(nseq == 2){
     if(!quiet) cat("Aligning seed sequences\n")
@@ -420,6 +428,8 @@ derivePHMM.list <- function(x, progressive = FALSE, seeds = NULL,
     seeds <- 1:2
   }else if(nseq == 1){
     msa1 <- matrix(x[[1]], nrow = 1)
+    colnames(msa1) <- paste(1:ncol(msa1))
+    ## colnames are used when inserts = "inherited"
     seqweights <- 1
     rownames(msa1) <- names(seqweights) <- names(x)
     seeds <- 1
@@ -562,7 +572,7 @@ derivePHMM.default <- function(x, seqweights = "Gerstein", wfactor = 1, k = 5,
       l <- sum(!inserts)
     }
   }
-  ### emission counts
+  ### emission counts (redo now that we know insert positions)
   ecs <- if(AA){
     apply(x[, !inserts, drop = FALSE], 2, .tabulateAA,
           ambiguities = TRUE, seqweights = seqweights)
