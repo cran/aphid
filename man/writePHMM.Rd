@@ -4,7 +4,8 @@
 \alias{writePHMM}
 \title{Export profile hidden Markov models as text.}
 \usage{
-writePHMM(x, file = "", append = FALSE, form = "HMMER3", vers = "f")
+writePHMM(x, file = "", append = FALSE, form = "HMMER3",
+  vers = "f")
 }
 \arguments{
 \item{x}{an object of class \code{"PHMM"}.}
@@ -43,17 +44,18 @@ This function writes an object of class \code{"PHMM"} to a
   writePHMM(x, file = fl)
   readPHMM(fl)
   ##
-  ## Derive a PHMM for the woodmouse data and write to working directory
-  \dontrun{
+  ## Derive a PHMM for the woodmouse data and write to file
+  \donttest{
     library(ape)
     data(woodmouse)
     woodmouse.PHMM <- derivePHMM(woodmouse)
-    writePHMM(woodmouse.PHMM, file = "woodmouse.hmm")
+    tmpf <- tempfile(fileext = ".hmm")
+    writePHMM(woodmouse.PHMM, file = tmpf)
   }
 }
 \references{
 Finn, RD, Clements J & Eddy SR (2011) HMMER web server: interactive sequence
-  similarity searching. \emph{Nucleic Acids Research}. 39:W29-W37.
+  similarity searching. \emph{Nucleic Acids Research}. \strong{39} W29-W37.
   \url{http://hmmer.org/}.
 
   HMMER: biosequence analysis using profile hidden Markov models.
