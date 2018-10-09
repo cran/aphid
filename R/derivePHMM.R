@@ -8,11 +8,8 @@
 #' @param seqweights either NULL (all sequences are given weights
 #'   of 1), a numeric vector the same length as \code{x} representing
 #'   the sequence weights used to derive the model, or a character string giving
-#'   the method to derive the weights from the sequences. Currently only the
-#'   \code{"Gerstein"} method is supported (default). For this method, a
-#'   tree is first created by k-mer counting (see \code{\link[kmer]{cluster}}),
-#'   and sequence weights are then derived from the tree using the 'bottom up'
-#'   algorithm of Gerstein et al (1994).
+#'   the method to derive the weights from the sequences
+#'   (see \code{\link{weight}}).
 #' @param wfactor numeric. The factor to multiply the sequence weights by.
 #'   Defaults to 1.
 #' @param k integer representing the k-mer size to be used in tree-based
@@ -184,9 +181,6 @@
 #'   sequence analysis: probabilistic models of proteins and nucleic acids.
 #'   Cambridge University Press, Cambridge, United Kingdom.
 #'
-#'   Gerstein M, Sonnhammer ELL, Chothia C (1994) Volume changes in protein evolution.
-#'   \emph{Journal of Molecular Biology}, \strong{236}, 1067-1078.
-#'
 #' @seealso \code{\link{deriveHMM}}, \code{\link{map}}
 #' @examples
 #' ## Small globin alignment data from Durbin et al (1998) Figure 5.3
@@ -209,7 +203,7 @@ derivePHMM <- function(x, ...){
 ################################################################################
 #' @rdname derivePHMM
 ################################################################################
-derivePHMM.DNAbin <- function(x, seqweights = "Gerstein", wfactor = 1, k = 5,
+derivePHMM.DNAbin <- function(x, seqweights = "Henikoff", wfactor = 1, k = 5,
                               residues = NULL, gap = "-", endchar = "?",
                               pseudocounts = "background", logspace = TRUE,
                               qa = NULL, qe = NULL, maxsize = NULL,
@@ -253,7 +247,7 @@ derivePHMM.DNAbin <- function(x, seqweights = "Gerstein", wfactor = 1, k = 5,
 ################################################################################
 #' @rdname derivePHMM
 ################################################################################
-derivePHMM.AAbin <- function(x, seqweights = "Gerstein", wfactor = 1, k = 5,
+derivePHMM.AAbin <- function(x, seqweights = "Henikoff", wfactor = 1, k = 5,
                              residues = NULL, gap = "-", endchar = "?",
                              pseudocounts = "background", logspace = TRUE,
                              qa = NULL, qe = NULL, maxsize = NULL,
@@ -295,7 +289,7 @@ derivePHMM.AAbin <- function(x, seqweights = "Gerstein", wfactor = 1, k = 5,
 ################################################################################
 derivePHMM.list <- function(x, progressive = FALSE, seeds = NULL,
                             refine = "Viterbi", maxiter = 100, deltaLL = 1E-07,
-                            seqweights = "Gerstein", wfactor = 1, k = 5,
+                            seqweights = "Henikoff", wfactor = 1, k = 5,
                             residues = NULL, gap = "-",
                             pseudocounts = "background", logspace = TRUE,
                             qa = NULL, qe = NULL, maxsize = NULL,
@@ -347,8 +341,13 @@ derivePHMM.list <- function(x, progressive = FALSE, seeds = NULL,
       if(is.null(seqweights)){
         seqweights <- rep(1, nseq)
         names(seqweights) <- catchnames
+      }else if(identical(seqweights, "Henikoff")){
+        if(!quiet) cat("Calculating sequence weights using maximum entropy method\n")
+        seqweights <- weight(x, method = "Henikoff", k = k,
+                             residues = residues, gap = gap)
+        names(seqweights) <- catchnames
       }else if(identical(seqweights, "Gerstein")){
-        if(!quiet) cat("Calculating sequence weights\n")
+        if(!quiet) cat("Calculating sequence weights using tree-based method\n")
         seqweights <- weight(x, method = "Gerstein", k = k,
                              residues = residues, gap = gap)
         names(seqweights) <- catchnames
@@ -394,9 +393,8 @@ derivePHMM.list <- function(x, progressive = FALSE, seeds = NULL,
       if(is.null(seqweights)){
         seqweights <- rep(1, nseq)
         names(seqweights) <- names(x)
-      }else if(identical(seqweights, "Gerstein")){
-        seqweights <- weight(x, method = "Gerstein", k = k,
-                             residues = residues, gap = gap)
+      }else if(identical(seqweights, "Henikoff") | identical(seqweights, "Gerstein")){
+        seqweights <- weight(x, method = seqweights, k = k, residues = residues, gap = gap)
       }else{
         stopifnot(mode(seqweights) %in% c("numeric", "integer"),
                   length(seqweights) == nseq)
@@ -406,7 +404,7 @@ derivePHMM.list <- function(x, progressive = FALSE, seeds = NULL,
       lm <- as.numeric(names(sort(table(xlengths), decreasing = TRUE)[1]))
       if(!is.null(maxsize)){
         xlengths2 <- xlengths[xlengths <= maxsize]
-        if(length(xlengths2) == 0) stop("maxsize parameter is too low")
+        if(length(xlengths2) == 0) stop("maxsize parameter is too low\n")
         if(lm > maxsize) lm <- max(xlengths2)
       }
       longl <- xlengths == lm
@@ -449,6 +447,7 @@ derivePHMM.list <- function(x, progressive = FALSE, seeds = NULL,
                               quiet = quiet)
   if(nseq < 3){
     if(!quiet) cat("Done\n")
+    if(para & stopclustr) parallel::stopCluster(cores)
     return(model)
   }
   ## train model
@@ -474,7 +473,7 @@ derivePHMM.list <- function(x, progressive = FALSE, seeds = NULL,
 ################################################################################
 #'@rdname derivePHMM
 ################################################################################
-derivePHMM.default <- function(x, seqweights = "Gerstein", wfactor = 1, k = 5,
+derivePHMM.default <- function(x, seqweights = "Henikoff", wfactor = 1, k = 5,
                                residues = NULL, gap = "-", endchar = "?",
                                pseudocounts = "background", logspace = TRUE,
                                qa = NULL, qe = NULL, maxsize = NULL,
@@ -484,7 +483,9 @@ derivePHMM.default <- function(x, seqweights = "Gerstein", wfactor = 1, k = 5,
                                consensus = FALSE, alignment = FALSE, cpp = TRUE,
                                quiet = FALSE,
                                ...){
-  if(!(is.matrix(x))) stop("invalid object type, x must be a matrix")
+  # if(!quiet) cat("Deriving profile HMM from alignment\n")
+  #if(!(is.matrix(x))) stop("invalid object type, x must be a matrix")
+  if(is.null(dim(x))) x <- matrix(x, nrow = 1)
   catchnames <- rownames(x)
   rownames(x) <- paste0("S", 1:nrow(x)) ## just ensures names are unique
   DNA <- .isDNA(x) # raw DNA bytes
@@ -499,13 +500,15 @@ derivePHMM.default <- function(x, seqweights = "Gerstein", wfactor = 1, k = 5,
   m <- ncol(x)
   states <- c("D", "M", "I")
   transitions <- c("DD", "DM", "DI", "MD", "MM", "MI", "ID", "IM", "II")
-  xlist <- unalign(x, gap = gap)
+
   if(is.null(seqweights)){
     seqweights <- rep(1, n)
-  }else if(identical(seqweights, "Gerstein")){
+  }else if(identical(seqweights, "Gerstein") | identical(seqweights, "Henikoff")){
     seqweights <- if(n > 2){
-      weight(xlist, k = k, residues = residues, gap = gap)
-    }else rep(1, n)
+      weight(unalign(x, gap = gap), method = seqweights, k = k, residues = residues, gap = gap)
+    }else{
+      rep(1, n)
+    }
   }else{
     stopifnot(
       length(seqweights) == n,
@@ -513,8 +516,9 @@ derivePHMM.default <- function(x, seqweights = "Gerstein", wfactor = 1, k = 5,
       mode(seqweights) %in% c("numeric", "integer")
     )
   }
-  seqweights <- seqweights * wfactor
+  if(wfactor != 1) seqweights <- seqweights * wfactor
   # background emission probabilities (qe)
+  # if(!quiet) cat("Finding background emission probabilities\n")
   if(is.null(qe)){
     allecs <- if(AA){
       apply(x, 2, .tabulateAA, ambiguities = TRUE, seqweights = seqweights)
@@ -537,7 +541,11 @@ derivePHMM.default <- function(x, seqweights = "Gerstein", wfactor = 1, k = 5,
   # designate insert-columns
   gaps <- x == gap
   #ends <- x == endchar
-  gapweights <- gaps * seqweights
+  #gapweights <- gaps * seqweights
+  sws <- sum(seqweights)
+  gpws <- numeric(m)
+  for(i in seq_along(gpws)) gpws[i] <- sum(seqweights[gaps[, i]])
+  # if(!quiet) cat("Marking insert states\n")
   if(identical(inserts, "none")){
     inserts <- rep(FALSE, m)
   }else if(identical(inserts, "inherited")){
@@ -545,19 +553,21 @@ derivePHMM.default <- function(x, seqweights = "Gerstein", wfactor = 1, k = 5,
     inserts <- colnames(x) == "I"
     if(is.null(inserts)) stop("Alignment missing 'inserts', nothing to inherit")
   }else if(identical(inserts, "threshold")){
-    inserts <- apply(gapweights, 2, sum) > threshold * n
+    # inserts <- apply(gapweights, 2, sum) > threshold * n
+    inserts <- gpws > threshold * sws
   }else if(identical(inserts, "map")){
     if(n < 5 | sum(gaps)/length(gaps) > 0.9){
       # Maximum a posteriori insert assignment unsuitable for
       # fewer than five sequences.
       # Also can use too much memory for very gappy (sparse) alignments
-      inserts <- apply(gapweights, 2, sum) > threshold * n
+      # inserts <- apply(gapweights, 2, sum) > threshold * n
+      inserts <- gpws > threshold * sws
     }else{
       inserts <- !map(x, seqweights = seqweights, residues = residues,
                       gap = gap, endchar = endchar, pseudocounts = pseudocounts,
                       qa = qa, qe = qe, cpp = cpp)
-      if(sum(!inserts) < 3) inserts <- apply(gapweights, 2, sum) > threshold * n
-      gc()
+      # if(sum(!inserts) < 3) inserts <- apply(gapweights, 2, sum) > threshold * n
+      if(sum(!inserts) < 3) inserts <- gpws > threshold * sws
     }
   }else if(!(mode(inserts) == "logical" & length(inserts) == ncol(x))){
     stop("invalid inserts argument")
@@ -567,12 +577,15 @@ derivePHMM.default <- function(x, seqweights = "Gerstein", wfactor = 1, k = 5,
     maxsize <- as.integer(maxsize)
     if(maxsize < 3) stop("maxsize is too small")
     if(maxsize < l){
-      gapnos <- apply(gapweights[, !inserts, drop = FALSE], 2, sum)
-      inserts[!inserts][order(gapnos)[(maxsize + 1):l]] <- TRUE
+      # gapnos <- apply(gapweights[, !inserts, drop = FALSE], 2, sum)
+      gapnos <- gpws[!inserts]
+      inserts[!inserts][order(gapnos)[seq(maxsize + 1, l)]] <- TRUE
       l <- sum(!inserts)
     }
   }
+  # rm(gapweights)
   ### emission counts (redo now that we know insert positions)
+  # if(!quiet) cat("Finding emission probabilities\n")
   ecs <- if(AA){
     apply(x[, !inserts, drop = FALSE], 2, .tabulateAA,
           ambiguities = TRUE, seqweights = seqweights)
@@ -587,13 +600,18 @@ derivePHMM.default <- function(x, seqweights = "Gerstein", wfactor = 1, k = 5,
     dimnames(ecs) <- list(residue = residues, position = 1:l)
   }else ecs <- NULL
   ### transitions
-  xtr <- matrix(nrow = n, ncol = m)
+  # if(!quiet) cat("Finding transition probabilities\n")
+  xtr <- matrix(NA_integer_, nrow = n, ncol = m)
   insertsn <- matrix(rep(inserts, n), nrow = n, byrow = TRUE)
   xtr[gaps & !insertsn] <- 0L # Delete
   xtr[!gaps & !insertsn] <- 1L # Match
   xtr[!gaps & insertsn] <- 2L # Insert
+  rm(gaps)
+  rm(insertsn)
   xtr <- cbind(1L, xtr, 1L) # append begin and end match states
   tcs <- .atab(xtr, seqweights = seqweights)
+  rm(xtr)
+  gc()
   alltcs <- apply(tcs, 1, sum) + 1 # forced addition of Laplacian pseudos
   ### background transition probs
   if(is.null(qa)){
@@ -624,6 +642,10 @@ derivePHMM.default <- function(x, seqweights = "Gerstein", wfactor = 1, k = 5,
            named vectors 'A' (transition pseudocounts) and/or 'E'
            (emission pseudocounts)")
     }
+  }else if(mode(pseudocounts) %in% c("numeric", "integer") & length(pseudocounts) == 1L){
+    pseudocounts <- list(A = rep(pseudocounts, 9), E = rep(pseudocounts, nres))
+    pseudocounts$A[3] <- pseudocounts$A[3] * DI
+    pseudocounts$A[7] <- pseudocounts$A[7] * ID
   }else if(identical(pseudocounts, "background")){
     pseudocounts <- list(A = qa * (7 + sum(c(DI, ID))), E = qe * nres)
   }else if(identical(pseudocounts, "Laplace")){
@@ -688,6 +710,8 @@ derivePHMM.default <- function(x, seqweights = "Gerstein", wfactor = 1, k = 5,
     res$alignment <- x
   }
   if(compo) res$compo <- log(apply(exp(E), 1, mean))
+  gc()
+  # if(!quiet) cat("Done\n")
   return(res)
 }
 ################################################################################
@@ -828,6 +852,8 @@ map <- function(x, seqweights = NULL, residues = NULL,
            be a vector the same length as the size of the residue alphabet
           (e.g. 4 for DNA, 20 for amino acids)")
     }
+  }else if(mode(pseudocounts) %in% c("numeric", "integer") & length(pseudocounts) == 1L){
+    pseudocounts <- list(A = rep(pseudocounts, 9), E = rep(pseudocounts, nres))
   }else if(identical(pseudocounts, "background")){
     pseudocounts <- list(A = exp(qa) * 9, E = exp(qe) * nres)
   }else if(identical(pseudocounts, "Laplace")){
@@ -908,6 +934,7 @@ map <- function(x, seqweights = NULL, residues = NULL,
     }
     res <- res[-(c(1, L + 2))]
   }
+  gc()
   return(res)
 }
 ################################################################################

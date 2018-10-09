@@ -48,6 +48,45 @@
 ## Convert a vector in any arity to a decimal integer
 .decimal <- function(x, from) sum(x * from^rev(seq_along(x) - 1))
 
+## DNA, AA and character string conversion functions
+.d2s <- function(x){
+  cbytes <- as.raw(c(65, 84, 71, 67, 83, 87, 82, 89, 75,
+                     77, 66, 86, 72, 68, 78, 45, 63))
+  indices <- c(136, 24, 72, 40, 96, 144, 192, 48, 80,
+               160, 112, 224, 176, 208, 240, 4, 2)
+  vec <- raw(240)
+  vec[indices] <- cbytes
+  res <- if(is.list(x)){
+    vapply(x, function(s) rawToChar(vec[as.integer(s)]), "")
+  }else{
+    rawToChar(vec[as.integer(x)])
+  }
+  return(res)
+}
+
+.a2s <- function(x) if(is.list(x)) vapply(x, rawToChar, "") else rawToChar(x)
+
+.s2d <- function(z, simplify = FALSE){
+  dbytes <- as.raw(c(136, 24, 72, 40, 96, 144, 192, 48, 80,
+                     160, 112, 224, 176, 208, 240, 240, 4, 2))
+  indices <- c(65, 84, 71, 67, 83, 87, 82, 89, 75, 77, 66,
+               86, 72, 68, 78, 73, 45, 63) # max 89
+  vec <- raw(89)
+  vec[indices] <- dbytes
+  s2d1 <- function(s) vec[as.integer(charToRaw(s))]
+  res <- if(length(z) == 1 & simplify) s2d1(z) else lapply(z, s2d1)
+  class(res) <- "DNAbin"
+  return(res)
+}
+
+.s2a <- function(z, simplify = FALSE){
+  res <- if(length(z) == 1 & simplify) charToRaw(z) else lapply(z, charToRaw)
+  class(res) <- "AAbin"
+  return(res)
+}
+
+
+
 ## Remove unknown end characters
 .trim <- function(x, gap = "-", endchar = "?", DNA = FALSE, AA = FALSE){
   #X is a raw or character matrix
@@ -325,7 +364,7 @@
   }else if(a == guide[21]){# U (Selenocysteine)
     return(nonambigs[2]) #C )(Cysteine)
   }else if(a == guide[27] | a == guide[28]) {
-    return(NULL)
+    stop("Amino acid sequence contains stop codons and/or gaps\n")
   }else stop("invalid byte for class 'AAbin'")
 }
 
@@ -338,7 +377,7 @@
     fun <- function(v){
       v <- unclass(v)
       ambigs <- (v & as.raw(8)) != 8
-      if(any(ambigs)) v[ambigs] <- sapply(v[ambigs], .disambiguateDNA, probs, random)
+      if(any(ambigs)) v[ambigs] <- sapply(unclass(v[ambigs]), .disambiguateDNA, probs, random)
       bits <- c(136, 24, 72, 40)
       ints <- 0:3
       res <- ints[match(as.numeric(v), bits)]
@@ -367,7 +406,7 @@
   if(arity == 20){
     fun <- function(v){
       ambigs <- !(v %in% as.raw((65:89)[-c(2, 10, 15, 21, 24)]))
-      if(any(ambigs)) v[ambigs] <- sapply(v[ambigs], .disambiguateAA, probs)
+      if(any(ambigs)) v[ambigs] <- sapply(unclass(v[ambigs]), .disambiguateAA, probs)
       bits <- (65:89)[-c(2, 10, 15, 21, 24)]
       ints <- 0:19
       res <- ints[match(as.numeric(v), bits)]
@@ -519,22 +558,34 @@
 }
 
 ## Find MD5 hash for a character or raw sequence
-.digest <- function(x, simplify = TRUE){
-  digest1 <- function(s){
-    if(mode(s) != "raw"){
-      if(mode(s) == "character"){
-        s <- sapply(s, charToRaw)
-      }else if(mode(s) == "integer"){
-        s <- sapply(s, as.raw)
-      }else if(mode(s) == "numeric"){
-        stop("Can't digest numeric vectors")
+.digest <- function(x){
+  if(mode(x) == "raw") x <- rawToChar(x)
+  if(mode(x) == "list"){
+    if(length(x) == 0){
+      return(NULL)
+    }else{
+      if(mode(x[[1]]) == "raw"){
+        x <- vapply(x, rawToChar, "", USE.NAMES = TRUE)
+      }else if(mode(x[[1]]) %in% c("character", "numeric")){
+        x <- vapply(x, paste0, "", collapse = "", USE.NAMES = TRUE)
+      }else{
+        stop("Invalid input format\n")
       }
     }
-    return(paste(openssl::md5(as.vector(s))))
   }
-  if(is.list(x)){
-    if(simplify) return(sapply(x, digest1)) else return(lapply(x, digest1))
+  if(mode(x) == "character"){
+    nms <- names(x)
+    res <- openssl::md5(x)
+    names(res) <- nms
+    return(res)
   }else{
-    return(digest1(x))
+    stop("Invalid input format\n")
   }
+}
+
+.point <- function(h){
+  uh <- unique(h)
+  pointers <- seq_along(uh)
+  names(pointers) <- uh
+  unname(pointers[h])
 }

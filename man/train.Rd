@@ -8,12 +8,12 @@
 \usage{
 train(x, y, ...)
 
-\method{train}{PHMM}(x, y, method = "Viterbi", seqweights = "Gerstein",
+\method{train}{PHMM}(x, y, method = "Viterbi", seqweights = "Henikoff",
   wfactor = 1, k = 5, logspace = "autodetect", maxiter = 100,
-  deltaLL = 1e-07, pseudocounts = "background", gap = "-",
-  fixqa = FALSE, fixqe = FALSE, maxsize = NULL, inserts = "map",
-  threshold = 0.5, lambda = 0, alignment = FALSE, cores = 1,
-  quiet = FALSE, ...)
+  limit = 1, deltaLL = 1e-07, pseudocounts = "background",
+  gap = "-", fixqa = FALSE, fixqe = FALSE, maxsize = NULL,
+  inserts = "map", threshold = 0.5, lambda = 0, alignment = FALSE,
+  cores = 1, quiet = FALSE, ...)
 
 \method{train}{HMM}(x, y, method = "Viterbi", seqweights = NULL,
   wfactor = 1, maxiter = 100, deltaLL = 1e-07,
@@ -39,11 +39,8 @@ and \code{"BaumWelch"}.}
 \item{seqweights}{either NULL (all sequences are given weights
 of 1), a numeric vector the same length as \code{y} representing
 the sequence weights used to derive the model, or a character string giving
-the method to derive the weights from the sequences. Currently only the
-\code{"Gerstein"} method is supported (default). For this method, a
-tree is first created by k-mer counting (see \code{\link[kmer]{cluster}}),
-and sequence weights are then derived from the tree using the 'bottom up'
-algorithm of Gerstein et al (1994).}
+the method to derive the weights from the sequences
+(see \code{\link{weight}}).}
 
 \item{wfactor}{numeric. The factor to multiply the sequence weights by.
 Defaults to 1.}
@@ -64,6 +61,10 @@ increases the computational overhead; therefore specifying
 \item{maxiter}{the maximum number of EM iterations or Viterbi training
 iterations to carry out before the cycling process is terminated and
 the partially trained model is returned. Defaults to 100.}
+
+\item{limit}{the proportion of alignment rows that must be identical
+between subsequent iterations for the Viterbi training algorithm
+to terminate. Defaults to 1.}
 
 \item{deltaLL}{numeric, the maximum change in log likelihood between EM
 iterations before the cycling procedure is terminated (signifying model
@@ -149,7 +150,7 @@ available. Note that in this case there
 may be a tradeoff in terms of speed depending on the number and size
 of sequences to be aligned, due to the extra time required to initialize
 the cluster.
-Only applicable if x is a \code{"PHMM"} and \code{method = "Viterbi"}.}
+Only applicable if x is an object of class \code{"PHMM"}.}
 
 \item{quiet}{logical indicating whether feedback should be printed
 to the console.}
@@ -191,9 +192,6 @@ This function optimizes the parameters of a hidden Markov model
   on the nature of the problem, but personal experience suggests that
   the methods are comparable for training profile HMMs for DNA and
   amino acid sequences.
-
-  Note that multi-threading is only currently available for Viterbi
-  training of profile HMMs.
 }
 \examples{
   ## Baum Welch training for standard HMMs:
@@ -220,9 +218,6 @@ This function optimizes the parameters of a hidden Markov model
 Durbin R, Eddy SR, Krogh A, Mitchison G (1998) Biological
   sequence analysis: probabilistic models of proteins and nucleic acids.
   Cambridge University Press, Cambridge, United Kingdom.
-
-  Gerstein M, Sonnhammer ELL, Chothia C (1994) Volume changes in protein evolution.
-  \emph{Journal of Molecular Biology}, \strong{236}, 1067-1078.
 
   Juang B-H, Rabiner LR (1990) The segmental K-means
   algorithm for estimating parameters of hidden Markov models.

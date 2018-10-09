@@ -14,11 +14,8 @@
 #' @param seqweights either NULL (all sequences are given weights
 #'   of 1), a numeric vector the same length as \code{y} representing
 #'   the sequence weights used to derive the model, or a character string giving
-#'   the method to derive the weights from the sequences. Currently only the
-#'   \code{"Gerstein"} method is supported (default). For this method, a
-#'   tree is first created by k-mer counting (see \code{\link[kmer]{cluster}}),
-#'   and sequence weights are then derived from the tree using the 'bottom up'
-#'   algorithm of Gerstein et al (1994).
+#'   the method to derive the weights from the sequences
+#'   (see \code{\link{weight}}).
 #' @param wfactor numeric. The factor to multiply the sequence weights by.
 #'   Defaults to 1.
 #' @param k integer representing the k-mer size to be used in tree-based
@@ -35,6 +32,9 @@
 #' @param maxiter the maximum number of EM iterations or Viterbi training
 #'   iterations to carry out before the cycling process is terminated and
 #'   the partially trained model is returned. Defaults to 100.
+#' @param limit the proportion of alignment rows that must be identical
+#'   between subsequent iterations for the Viterbi training algorithm
+#'   to terminate. Defaults to 1.
 #' @param deltaLL numeric, the maximum change in log likelihood between EM
 #'   iterations before the cycling procedure is terminated (signifying model
 #'   convergence). Defaults to 1E-07. Only applicable if
@@ -112,7 +112,7 @@
 #'   may be a tradeoff in terms of speed depending on the number and size
 #'   of sequences to be aligned, due to the extra time required to initialize
 #'   the cluster.
-#'   Only applicable if x is a \code{"PHMM"} and \code{method = "Viterbi"}.
+#'   Only applicable if x is an object of class \code{"PHMM"}.
 #' @param quiet logical indicating whether feedback should be printed
 #'   to the console.
 #' @param ... aditional arguments to be passed to \code{"Viterbi"} (if
@@ -146,17 +146,11 @@
 #'   the methods are comparable for training profile HMMs for DNA and
 #'   amino acid sequences.
 #'
-#'   Note that multi-threading is only currently available for Viterbi
-#'   training of profile HMMs.
-#'
 #' @author Shaun Wilkinson
 #' @references
 #'   Durbin R, Eddy SR, Krogh A, Mitchison G (1998) Biological
 #'   sequence analysis: probabilistic models of proteins and nucleic acids.
 #'   Cambridge University Press, Cambridge, United Kingdom.
-#'
-#'   Gerstein M, Sonnhammer ELL, Chothia C (1994) Volume changes in protein evolution.
-#'   \emph{Journal of Molecular Biology}, \strong{236}, 1067-1078.
 #'
 #'   Juang B-H, Rabiner LR (1990) The segmental K-means
 #'   algorithm for estimating parameters of hidden Markov models.
@@ -194,9 +188,9 @@ train <- function(x, y, ...){
 ################################################################################
 #' @rdname train
 ################################################################################
-train.PHMM <- function(x, y, method = "Viterbi", seqweights = "Gerstein",
-                       wfactor = 1, k = 5,
-                       logspace = "autodetect", maxiter = 100, deltaLL = 1E-07,
+train.PHMM <- function(x, y, method = "Viterbi", seqweights = "Henikoff",
+                       wfactor = 1, k = 5, logspace = "autodetect",
+                       maxiter = 100, limit = 1, deltaLL = 1E-07,
                        pseudocounts = "background", gap = "-",
                        fixqa = FALSE, fixqe = FALSE, maxsize = NULL,
                        inserts = "map", threshold = 0.5, lambda = 0,
@@ -211,11 +205,10 @@ train.PHMM <- function(x, y, method = "Viterbi", seqweights = "Gerstein",
   n <- length(y)
   if(is.null(seqweights)){
     seqweights <- rep(1, n)
+  }else if(identical(seqweights, "Henikoff")){
+    seqweights <- weight(y, k = k, gap = gap, method = "Henikoff")
   }else if(identical(seqweights, "Gerstein")){
-    if(n > 2)
-      seqweights <- if(n > 2){
-        weight(y, k = k, gap = gap) # residues excluded for speed
-      }else rep(1, n)
+    seqweights <- weight(y, k = k, gap = gap, method = "Gerstein")
   }else{
     stopifnot(
       length(seqweights) == n,
@@ -286,10 +279,12 @@ train.PHMM <- function(x, y, method = "Viterbi", seqweights = "Gerstein",
     }
   }
   if(method  == "Viterbi"){
-    alig <- align.list(y, model = x, logspace = TRUE, cores = cores,
-                       ... = ...)
-    alig_cache <- character(maxiter)
-    alig_cache[1] <- .digest(alig, simplify = TRUE)
+    alig <- align.list(y, model = x, logspace = TRUE, cores = cores, ... = ...)
+    alig_cache <- character(maxiter + 1)
+    hashis <- apply(alig, 1, .digest)
+    hashi <- .digest(paste0(hashis, collapse = ""))
+    stopifnot(length(hashi) == 1)
+    alig_cache[1] <- hashi
     for(i in 1:maxiter){
       model <- derivePHMM.default(alig, seqweights = seqweights,
                                 residues = residues, gap = gap,
@@ -305,14 +300,19 @@ train.PHMM <- function(x, y, method = "Viterbi", seqweights = "Gerstein",
         cat(": alignment with", nrow(alig), "rows &", ncol(alig), "columns, ")
         cat("PHMM with", model$size, "modules\n")
       }
-      newalig <- align(y, model = model, logspace = TRUE, cores = cores,
-                       ... = ...)
-      newhash <- .digest(newalig, simplify = TRUE)
-      if(!any(sapply(alig_cache, identical, newhash))){
-        alig_cache[i + 1] <- newhash
-        alig <- newalig
-        rm(newalig)
-        gc()
+      rm(alig) ## free up space for next alignment
+      gc()
+      alig <- align(y, model = model, logspace = TRUE, cores = cores, ... = ...)
+      tmp <- apply(alig, 1, .digest)
+      breakme <- sum(tmp == hashis)/length(hashis) > limit
+      hashis <- tmp
+      hashi <- .digest(paste0(hashis, collapse = ""))
+      stopifnot(length(hashi) == 1)
+      #newhash <- .digest(alig)
+      if(!hashi %in% alig_cache & !breakme){
+      #if(!newhash %in% alig_cache){
+        #alig_cache[i + 1] <- newhash
+        alig_cache[i + 1] <- hashi
       }else{
         if(!logspace){
           model$A <- exp(model$A)
@@ -323,12 +323,22 @@ train.PHMM <- function(x, y, method = "Viterbi", seqweights = "Gerstein",
         if(!quiet) cat("Sequential alignments were identical after",
                        i, "iterations\n")
         if(para & stopclustr) parallel::stopCluster(cores)
+        gc()
         return(model)
       }
     }
     if(!quiet) cat("Sequential alignments were not identical after",
                    i, "iterations\n")
     if(para & stopclustr) parallel::stopCluster(cores)
+    model <- derivePHMM.default(alig, seqweights = seqweights,
+                                residues = residues, gap = gap,
+                                DI = DI, ID = ID, maxsize = maxsize,
+                                inserts = inserts, lambda = lambda,
+                                threshold = threshold,
+                                pseudocounts = pseudocounts,
+                                logspace = TRUE, alignment = alignment,
+                                qa = if(fixqa) x$qa else NULL,
+                                qe = if(fixqe) x$qe else NULL)
     return(model)
   }else if(method == "BaumWelch"){
     if(DNA){
@@ -363,7 +373,9 @@ train.PHMM <- function(x, y, method = "Viterbi", seqweights = "Gerstein",
     Epseudocounts <- x$E
     qepseudocounts <- x$qe
     # don't need x$qa since not updated during iteration
-    if(identical(pseudocounts, "background")){
+    if(mode(pseudocounts) %in% c("numeric", "integer") & length(pseudocounts) == 1L){
+      Apseudocounts[] <- Epseudocounts[] <- qepseudocounts[] <- pseudocounts
+    }else if(identical(pseudocounts, "background")){
       qepseudocounts <- exp(x$qe) * length(x$qe)
       Epseudocounts[] <- rep(qepseudocounts, l)
       qacounts <- exp(x$qa) * if(DI & ID) 9 else if (DI | ID) 8 else 7
@@ -541,7 +553,7 @@ train.PHMM <- function(x, y, method = "Viterbi", seqweights = "Gerstein",
       LL <- logPx
       gc()
     }
-    warning("Failed to converge. Try increasing 'maxiter' or modifying start parameters")
+    if(!quiet) cat("Warning: failed to converge. Try increasing 'maxiter' or modifying start parameters")
     if(!logspace){
       model$A <- exp(model$A)
       model$E <- exp(model$E)
@@ -555,6 +567,7 @@ train.PHMM <- function(x, y, method = "Viterbi", seqweights = "Gerstein",
       model$qe <- model$qe[PFAMorder]
     }
     if(para & stopclustr) parallel::stopCluster(cores)
+    gc()
     return(model)
   }else stop("Invalid argument given for 'method'")
 }

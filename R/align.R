@@ -32,11 +32,8 @@
 #' @param seqweights either NULL (all sequences are given weights
 #'   of 1), a numeric vector the same length as \code{x} representing
 #'   the sequence weights used to derive the model, or a character string giving
-#'   the method to derive the weights from the sequences. Currently only the
-#'   \code{"Gerstein"} method is supported (default). For this method, a
-#'   tree is first created by k-mer counting (see \code{\link[kmer]{cluster}}),
-#'   and sequence weights are then derived from the tree using the 'bottom up'
-#'   algorithm of Gerstein et al (1994).
+#'   the method to derive the weights from the sequences
+#'   (see \code{\link{weight}}).
 #' @param refine the method used to iteratively refine the model parameters
 #'   following the initial progressive alignment and model derivation step.
 #'   Current supported options are \code{"Viterbi"} (Viterbi training;
@@ -173,9 +170,6 @@
 #'   sequence analysis: probabilistic models of proteins and nucleic acids.
 #'   Cambridge University Press, Cambridge, United Kingdom.
 #'
-#'   Gerstein M, Sonnhammer ELL, Chothia C (1994) Volume changes in protein evolution.
-#'   \emph{Journal of Molecular Biology}, \strong{236}, 1067-1078.
-#'
 #'   Sievers F, Wilm A, Dineen D, Gibson TJ, Karplus K, Li W, Lopez R, McWilliam H,
 #'   Remmert M, Soding J, Thompson JD, Higgins DG (2011) Fast, scalable generation
 #'   of high-quality protein multiple sequence alignments using Clustal Omega.
@@ -209,7 +203,7 @@ align <- function(x, ...){
 #' @rdname align
 ################################################################################
 align.DNAbin <- function(x, model = NULL, progressive = FALSE, seeds = NULL,
-                         seqweights = "Gerstein", refine = "Viterbi", k = 5,
+                         seqweights = "Henikoff", refine = "Viterbi", k = 5,
                          maxiter = 100, maxsize = NULL, inserts = "map",
                          lambda = 0, threshold = 0.5, deltaLL = 1E-07,
                          DI = FALSE, ID = FALSE, residues = NULL, gap = "-",
@@ -233,7 +227,7 @@ align.DNAbin <- function(x, model = NULL, progressive = FALSE, seeds = NULL,
 #' @rdname align
 ################################################################################
 align.AAbin <- function(x, model = NULL, progressive = FALSE, seeds = NULL,
-                        seqweights = "Gerstein", refine = "Viterbi", k = 5,
+                        seqweights = "Henikoff", refine = "Viterbi", k = 5,
                         maxiter = 100, maxsize = NULL, inserts = "map",
                         lambda = 0, threshold = 0.5, deltaLL = 1E-07,
                         DI = FALSE, ID = FALSE, residues = NULL, gap = "-",
@@ -257,7 +251,7 @@ align.AAbin <- function(x, model = NULL, progressive = FALSE, seeds = NULL,
 #' @rdname align
 ################################################################################
 align.list <- function(x, model = NULL, progressive = FALSE, seeds = NULL,
-                       seqweights = "Gerstein", k = 5,
+                       seqweights = "Henikoff", k = 5,
                        refine = "Viterbi", maxiter = 100,
                        maxsize = NULL, inserts = "map", lambda = 0,
                        threshold = 0.5, deltaLL = 1E-07,
@@ -269,6 +263,7 @@ align.list <- function(x, model = NULL, progressive = FALSE, seeds = NULL,
   AA <- .isAA(x)
   if(DNA) class(x) <- "DNAbin" else if(AA) class(x) <- "AAbin"
   residues <- .alphadetect(x, residues = residues, gap = gap)
+  gapc <- gap
   gap <- if(AA) as.raw(45) else if(DNA) as.raw(4) else gap
   for(i in 1:length(x)) x[[i]] <- x[[i]][x[[i]] != gap]
   ## set up multithread
@@ -283,7 +278,7 @@ align.list <- function(x, model = NULL, progressive = FALSE, seeds = NULL,
     if(identical(cores, "autodetect")) cores <- navailcores - 1
     if(cores > 1){
       # if(cores > navailcores) stop("No. cores is more than number available")
-      if(!quiet) cat("Multithreading over", cores, "cores\n")
+      # if(!quiet) cat("Multithreading over", cores, "cores\n")
       cores <- parallel::makeCluster(cores)
       para <- TRUE
       stopclustr <- TRUE
@@ -320,57 +315,88 @@ align.list <- function(x, model = NULL, progressive = FALSE, seeds = NULL,
   }
   stopifnot(inherits(model, "PHMM"))
   l <- model$size
-  pathfinder <- function(s, model, ...){
-    vit <- Viterbi(model, s, ... = ...)
-    res <- c(vit$path, 1)
-    # append the final transition to end state
-    # this is just so the c++ function knows where to stop
-    # attr(res, "score") <- vit$score
-    return(res)
+  ## pathfinder function
+  pf <- function(s, model, ...){
+    path <- c(1L, Viterbi(model, s, ... = ...)$path)
+    news <- rep(gap, length(path))
+    news[path != 0L][-1L] <- s
+    newpath <- path
+    newpath[path == 0L] <- 1L
+    newpath[path == 2L] <- 0L
+    r <- split(news, f = cumsum(newpath) - 1L)
+    # rm(path)
+    # rm(newpath)
+    # rm(news)
+    r <- if(DNA) .d2s(r) else if(AA) .a2s(r) else vapply(r, paste0, "", collapse = "")
+    return(r)
   }
-  paths <- if(para & nseq > 10){
-    parallel::parLapply(cores, x, pathfinder, model = model, ...)
+  alig <- if(para & nseq > 10){
+    parallel::parLapply(cores, x, pf, model = model, ...)
   }else{
-    lapply(x, pathfinder, model, ...)
+    lapply(x, pf, model, ...)
   }
   if(para & stopclustr) parallel::stopCluster(cores)
-  # score <- sum(sapply(paths, function(p) attr(p, "score")))
-  fragseqs <- mapply(if(DNA | AA) .fragR else .fragC, x, paths, l = l,
-                     gap = gap, SIMPLIFY = FALSE)
-  rm(paths)
-  odds <- seq(1, 2 * l + 1, by = 2)
-  evens <- seq(2, 2 * l, by = 2)
-  inslens <- lapply(fragseqs, function(e) sapply(e[odds], length))
-  inslens <- matrix(unlist(inslens, use.names = FALSE), nrow = nseq, byrow = TRUE)
-  insmaxs <- apply(inslens, 2, max)
-  insappends <- t(insmaxs - t(inslens))
-  for(i in 1:nseq){
-    needsapp <- insappends[i, ] > 0
-    if(any(needsapp)){
-      apps <- lapply(insappends[i, needsapp], function(e) rep(gap, e))
-      fragseqs[[i]][odds][needsapp] <- mapply(c, fragseqs[[i]][odds][needsapp],
-                                              apps, SIMPLIFY = FALSE)
-    }
+  alig <- do.call("rbind", alig)
+  colfun <- function(v, gapc){
+    nc <- nchar(v)
+    if(any(nc > 1)) v <- paste0(v, strrep(gapc, max(nc) - nc))
+    return(v)
   }
-  unfragseqs <- lapply(fragseqs, unlist, use.names = FALSE)
-  # note prev line was causing major probs until use.names=F added
-  rm(fragseqs)
-  res <- matrix(unlist(unfragseqs, use.names = FALSE), nrow = nseq, byrow = TRUE)
-  rm(unfragseqs)
-  inserts <- vector(length = 2 * l + 1, mode = "list")
-  inserts[evens] <- FALSE
-  inserts[odds] <- lapply(insmaxs, function(e) rep(TRUE, e))
-  inserts <- unlist(inserts, use.names = TRUE)
-  resnames <- vector(length = 2 * l + 1, mode = "list")
-  resnames[evens] <- paste(1:l)
-  resnames[odds] <- lapply(insmaxs, function(e) rep("I", e))
-  resnames <- unlist(resnames, use.names = TRUE)
-  colnames(res) <- resnames
-  rownames(res) <- names(x)
-  class(res) <- if(DNA) "DNAbin" else if(AA) "AAbin" else NULL
-  # attr(res, "score") <- score
-  # attr(res, "inserts") <- inserts
-  return(res)
+  alig <- apply(alig, 2, colfun, gapc)
+  if(is.null(dim(alig))){## apply always simplifies vectors!
+    alig <- rbind(alig)
+    rownames(alig) <- names(x)[1]
+  }
+  ins <- strrep("I|", nchar(alig[1L, ]) - 1)
+  newcolnms <- paste0(colnames(alig), "|", ins)
+  newcolnms <- paste0(newcolnms, collapse = "")
+  newcolnms <- gsub("I\\|$", "I", newcolnms) #in case ends on insert state
+  newcolnms <- unlist(strsplit(newcolnms, split = "\\|"), use.names = FALSE)
+  alig <- apply(alig, 1, paste0, collapse = "")
+  alig <- if(DNA) .s2d(alig) else if(AA) .s2a(alig) else strsplit(alig, split = "")
+  alig <- do.call("rbind", alig)
+  colnames(alig) <- newcolnms
+  rownames(alig) <- names(x)
+  alig <- alig[, -1L, drop = FALSE] ## remove gap emitted by begin state
+  class(alig) <- if(DNA) "DNAbin" else if(AA) "AAbin" else NULL
+  gc()
+  return(alig)
+  # paths <- lapply(paths, as.integer)
+  # # score <- sum(sapply(paths, function(p) attr(p, "score")))
+  # fragseqs <- mapply(if(DNA | AA) .fragR else .fragC, x, paths, l = l,
+  #                    gap = gap, SIMPLIFY = FALSE)
+  # paths <- NULL
+  # odds <- seq(1, 2 * l + 1, by = 2)
+  # evens <- seq(2, 2 * l, by = 2)
+  # inslens <- lapply(fragseqs, function(e) sapply(e[odds], length))
+  # inslens <- matrix(unlist(inslens, use.names = FALSE), nrow = nseq, byrow = TRUE)
+  # insmaxs <- apply(inslens, 2, max)
+  # insappends <- t(insmaxs - t(inslens))
+  # for(i in 1:nseq){
+  #   needsapp <- insappends[i, ] > 0
+  #   if(any(needsapp)){
+  #     apps <- lapply(insappends[i, needsapp], function(e) rep(gap, e))
+  #     fragseqs[[i]][odds][needsapp] <- mapply(c, fragseqs[[i]][odds][needsapp],
+  #                                             apps, SIMPLIFY = FALSE)
+  #   }
+  # }
+  # unfragseqs <- lapply(fragseqs, unlist, use.names = FALSE)
+  # # note prev line was causing major probs until use.names=F added
+  # fragseqs <- NULL
+  # res <- matrix(unlist(unfragseqs, use.names = FALSE), nrow = nseq, byrow = TRUE)
+  # unfragseqs <- NULL
+  # inserts <- vector(length = 2 * l + 1, mode = "list")
+  # inserts[evens] <- FALSE
+  # inserts[odds] <- lapply(insmaxs, function(e) rep(TRUE, e))
+  # inserts <- unlist(inserts, use.names = TRUE)
+  # resnames <- vector(length = 2 * l + 1, mode = "list")
+  # resnames[evens] <- paste(1:l)
+  # resnames[odds] <- lapply(insmaxs, function(e) rep("I", e))
+  # resnames <- unlist(resnames, use.names = TRUE)
+  # colnames(res) <- resnames
+  # rownames(res) <- names(x)
+  # class(res) <- if(DNA) "DNAbin" else if(AA) "AAbin" else NULL
+  # return(res)
 }
 ################################################################################
 #' @rdname align
@@ -443,7 +469,7 @@ align.default <- function(x, model, pseudocounts = "background",
       rm(tmp) # the old switcharoo
     }
     n <- nrow(x)
-    z <- derivePHMM(x, seqweights = "Gerstein", k = 2, pseudocounts = pseudocounts,
+    z <- derivePHMM(x, seqweights = "Henikoff", k = 2, pseudocounts = pseudocounts,
                      residues = residues, logspace = TRUE)
     l <- z$size
     alignment <- Viterbi(z, model, ... = ...)
@@ -535,9 +561,9 @@ align.default <- function(x, model, pseudocounts = "background",
   }else if(nrow(x) > 1 & nrow(model) > 1){ # if both args are alignments
     nx <- nrow(x)
     ny <- nrow(model)
-    zx <- derivePHMM(x, seqweights = "Gerstein", k = 2, pseudocounts = pseudocounts,
+    zx <- derivePHMM(x, seqweights = "Henikoff", k = 2, pseudocounts = pseudocounts,
                      residues = residues, logspace = TRUE)
-    zy <- derivePHMM(model,  seqweights = "Gerstein", k = 2, pseudocounts = pseudocounts,
+    zy <- derivePHMM(model,  seqweights = "Henikoff", k = 2, pseudocounts = pseudocounts,
                      residues = residues, logspace = TRUE)
     lx <- zx$size
     ly <- zy$size
