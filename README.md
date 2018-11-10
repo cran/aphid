@@ -3,7 +3,6 @@
 Analysis with profile hidden Markov models
 
 
-
 --------------------------------------------------------------------------------
 
 `aphid` is an R package for the development and application of
