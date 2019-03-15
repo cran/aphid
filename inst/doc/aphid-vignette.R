@@ -82,7 +82,7 @@ data(globins)
 globins
 
 ## ---- fig.width=7.15, fig.height=5---------------------------------------
-globins.PHMM <- derivePHMM(globins, residues = "AMINO", seqweights = NULL)
+globins.PHMM <- derivePHMM(globins, residues = "AMINO", pseudocounts = "Laplace")
 plot(globins.PHMM)
 
 ## ------------------------------------------------------------------------
@@ -94,6 +94,7 @@ c("D", "M", "I")[path + 1]
 
 ## ------------------------------------------------------------------------
 sim <- list(length = 10)
+suppressWarnings(RNGversion("3.5.0"))
 set.seed(9999)
 for(i in 1:10) sim[[i]] <- generate(globins.PHMM, size = 20)
 sim

@@ -1,7 +1,7 @@
 Package: aphid
 Type: Package
 Title: Analysis with Profile Hidden Markov Models
-Version: 1.3.1
+Version: 1.3.2
 Authors@R: person("Shaun", "Wilkinson", email = "shaunpwilkinson@gmail.com",
     role = c("aut", "cre"))
 Author: Shaun Wilkinson [aut, cre]
@@ -29,8 +29,8 @@ Imports: graphics, openssl, kmer (>= 1.0.0), Rcpp (>= 0.12.5), stats
 Suggests: ape (>= 4.0), knitr, rmarkdown, testthat
 LinkingTo: Rcpp
 VignetteBuilder: knitr
-RoxygenNote: 6.1.0
+RoxygenNote: 6.1.1
 NeedsCompilation: yes
-Packaged: 2018-11-10 01:23:41 UTC; shaun
+Packaged: 2019-03-15 03:16:26 UTC; shaun
 Repository: CRAN
-Date/Publication: 2018-11-10 05:50:03 UTC
+Date/Publication: 2019-03-15 07:03:29 UTC

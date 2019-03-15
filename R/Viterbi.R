@@ -146,6 +146,7 @@
 #'   globins.PHMM <- derivePHMM(globins, residues = "AMINO", seqweights = NULL)
 #'   plot(globins.PHMM, main = "Profile hidden Markov model for globins")
 #'   ### Simulate a random sequence from the model
+#'   suppressWarnings(RNGversion("3.5.0"))
 #'   set.seed(999)
 #'   simulation <- generate(globins.PHMM, size = 20)
 #'   simulation ## "F" "S" "A" "N" "N" "D" "W" "E"
@@ -664,7 +665,7 @@ Viterbi.HMM <- function (x, y, logspace = "autodetect", cpp = TRUE, ...){
   }else{
     H <- length(states) # not including Begin state
     path <- integer(n)
-    V <- array(-Inf, dim = c(H, n), dimnames = list(state = states, roll = 1:n))
+    V <- array(-Inf, dim = c(H, n), dimnames = list(state = states, position = 1:n))
     P <- V + NA # pointer array
     tmp <- matrix(nrow = H, ncol = H)
     if(DNA){
