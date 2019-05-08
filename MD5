@@ -1,4 +1,4 @@
-7599f00ee493473b9f73d453c1bd3959 *DESCRIPTION
+ecd18f8801c88ed7b1972e9298b01eb0 *DESCRIPTION
 bd9290cfd0901c58ed8165117de347bc *NAMESPACE
 6b26cf66fcc4992effdb12452ef54b31 *R/RcppExports.R
 5edcf9f28842f9edab8b08dfd67bd0b1 *R/Viterbi.R
@@ -11,15 +11,15 @@ b6d53697d1e44c1408d2912bae192056 *R/derivePHMM.R
 f798b187f4b2b2267278df8715c70d7c *R/forward.R
 f07282c2d3481f7a6a1644f0d5665083 *R/generate.R
 ee005f1be032f6b80c2ba9729c9cb774 *R/plot.R
-c73372c6bccf9abbfe6b1eb2539c530d *R/posterior.R
+fc779a3513ad8bd12da21359bd243729 *R/posterior.R
 aa57079b4f0551331fcf27f0228a9111 *R/print.R
 0fa7aca56d2553ff339cafdd84f05db0 *R/read.R
-5681d37df9074ed3a623aad8ef62e52e *R/train.R
+aff979659ad2fe60219a6b25440f3185 *R/train.R
 bb3afb5fdf7c7aa403c77640db67805b *R/utils.R
 540c341c967761a17d9aca2398e814d9 *R/weight.R
 f0a70f3b4525832b7dab4f47c6f20690 *R/write.R
-dcf792a1e75851ad9a47fcdf19669350 *README.md
-855264ebb27cd0a596cfafd3d1616769 *build/vignette.rds
+93f06add738aeee9138aa53ae5898cea *README.md
+3f22426660225243975291b5f91a4a97 *build/vignette.rds
 2cec5e355bd0f72eb17885d6f7c531f9 *data/casino.RData
 5591c4ffe2abef1e50d907b8100b7731 *data/globins.RData
 6d7df45f3d14ed8fbf40808b19071350 *data/substitution.RData
@@ -41,7 +41,7 @@ f9679e0e28d1c109071da90f7f7bbb9a *man/logsum.Rd
 aa4d4471d4aca627eb7057ee426b4369 *man/map.Rd
 f2d8a970dd6ee595fb9fffde67e714e5 *man/plot.HMM.Rd
 54d2213cb529e5717f3e33c40b93fc2c *man/plot.PHMM.Rd
-19f1936be6d9af01838e4f8f0801e3f2 *man/posterior.Rd
+c08542d155fca9a43bd9467f3c1ba59b *man/posterior.Rd
 f63481d41e9a23f95009252922ae3aeb *man/print.Rd
 17938ed78b5f0c95a54fdf612fd94458 *man/readPHMM.Rd
 67609edc31125ae4604c5b70f8887a16 *man/substitution.Rd
