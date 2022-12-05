@@ -157,9 +157,7 @@
 #' @return an object of class \code{"PHMM"}
 #' @details
 #'   This function performs a similar operation to the  \code{hmmbuild}
-#'   function in the \href{http://www.hmmer.org}{HMMER} package, and the
-#'   \code{modelfromalign} and \code{buildmodel} functions in the
-#'   \href{https://compbio.soe.ucsc.edu/sam.html}{SAM} package.
+#'   function in the \href{http://www.hmmer.org}{HMMER} package.
 #'   If the primary input argument is an alignment, the function creates a
 #'   profile hidden Markov model (object class:\code{"PHMM"}) using the
 #'   method described in Durbin et al (1998) chapter 5.3. Alternatively, if
@@ -559,8 +557,8 @@ derivePHMM.default <- function(x, seqweights = "Henikoff", wfactor = 1, k = 5,
   }else if(identical(inserts, "threshold")){
     # inserts <- apply(gapweights, 2, sum) > threshold * n
     inserts <- gpws > threshold * sws
-  }else if(identical(inserts, "map")){
-    if(n < 5 | sum(gaps)/length(gaps) > 0.9){
+  }else if(identical(inserts, "map") | identical(pseudocounts, "none")){
+    if(n < 10 | sum(gaps)/length(gaps) > 0.9){
       # Maximum a posteriori insert assignment unsuitable for
       # fewer than five sequences.
       # Also can use too much memory for very gappy (sparse) alignments
@@ -655,7 +653,7 @@ derivePHMM.default <- function(x, seqweights = "Henikoff", wfactor = 1, k = 5,
   }else if(identical(pseudocounts, "Laplace")){
     pseudocounts <- list(A = c(1,1,DI,1,1,1,ID,1,1), E = rep(1, nres))
   }else if(identical(pseudocounts, "none")){
-    pseudocounts <- list(A = rep(0, 9), E = rep(0, nres))
+    pseudocounts <- list(A = rep(0.00001, 9), E = rep(0.00001, nres))
   }else stop("invalid pseudocounts argument")
   tcs <- tcs + pseudocounts$A
   tcs[1:3, 1] <- tcs[c(1, 4, 7), l + 1] <- 0

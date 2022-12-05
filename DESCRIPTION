@@ -1,7 +1,7 @@
 Package: aphid
 Type: Package
 Title: Analysis with Profile Hidden Markov Models
-Version: 1.3.3
+Version: 1.3.5
 Authors@R: person("Shaun", "Wilkinson", email = "shaunpwilkinson@gmail.com",
     role = c("aut", "cre"))
 Author: Shaun Wilkinson [aut, cre]
@@ -19,18 +19,18 @@ Description: Designed for the development and application of
     Based on the models and algorithms described in Durbin et 
     al (1998, ISBN: 9780521629713).
 License: GPL-3
-URL: http://github.com/shaunpwilkinson/aphid
-BugReports: http://github.com/shaunpwilkinson/aphid/issues
+URL: https://github.com/shaunpwilkinson/aphid
+BugReports: https://github.com/shaunpwilkinson/aphid/issues
 LazyData: TRUE
 Encoding: UTF-8
 SystemRequirements: GNU make
 Depends: R(>= 3.0.0)
 Imports: graphics, openssl, kmer (>= 1.0.0), Rcpp (>= 0.12.5), stats
-Suggests: ape (>= 4.0), knitr, rmarkdown, testthat
+Suggests: ape (>= 4.0), knitr, qpdf, rmarkdown, testthat
 LinkingTo: Rcpp
 VignetteBuilder: knitr
-RoxygenNote: 6.1.1
+RoxygenNote: 7.1.1
 NeedsCompilation: yes
-Packaged: 2019-05-08 03:48:34 UTC; shaun
+Packaged: 2022-12-04 01:59:59 UTC; shaun
 Repository: CRAN
-Date/Publication: 2019-05-08 05:20:14 UTC
+Date/Publication: 2022-12-05 08:10:13 UTC

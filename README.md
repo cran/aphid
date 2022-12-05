@@ -4,7 +4,6 @@ Analysis with profile hidden Markov models
 
 
 
-
 --------------------------------------------------------------------------------
 
 `aphid` is an R package for the development and application of
@@ -36,7 +35,7 @@ library("aphid")
 
 To download the development version from 
 GitHub, first ensure a C/C++ compliler is available and the 
-[devtools](https://github.com/hadley/devtools) R package is installed. 
+[devtools](https://github.com/r-lib/devtools) R package is installed. 
 Linux users will generally have a compiler installed by default; 
 however Windows users may need to download 
 [Rtools](https://cran.r-project.org/bin/windows/Rtools/) and Mac 
@@ -63,12 +62,12 @@ vignette("aphid-vignette")
 
 ### Issues
 If you experience a problem using this package please feel free to
-raise it as an issue on [GitHub](http://github.com/shaunpwilkinson/aphid/issues).
+raise it as an issue on [GitHub](https://github.com/shaunpwilkinson/aphid/issues).
 
 
 ### Acknowledgements
 This software was developed at 
-[Victoria University of Wellington](http://www.victoria.ac.nz/) 
+[Victoria University of Wellington](https://www.wgtn.ac.nz/) 
 with funding from a Rutherford Foundation Postdoctoral Research Fellowship 
 award from the Royal Society of New Zealand.
 
